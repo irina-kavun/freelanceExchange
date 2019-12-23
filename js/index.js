@@ -10,19 +10,36 @@ document.addEventListener('DOMContentLoaded', () => {
         formCustomer = document.getElementById('form-customer'),
         ordersTable = document.getElementById('orders'),
         modalOrder = document.getElementById('order_read'),
-        modalOrderActive = document.getElementById('order_active');
+        modalOrderActive = document.getElementById('order_active'),
+        headTable = document.getElementById('headTable');
 
+    //получаем даные из local storage, если их нет то подготавливаем массив
     const orders = JSON.parse(localStorage.getItem('freeOrders')) || [];
 
+    //сохранение в local storage
     const toStorage = () => {
         localStorage.setItem('freeOrders', JSON.stringify(orders))
     };
 
-    const calcDeadline = (deadline) => {
-        const day = '10 days';
-        return day
+    //для склонения слов в зависимости от числа (1 день 2 дня 5 дней)
+    const declOfNum = (number, titles) => number + ' ' + titles[(number % 100 > 4 && number % 100 < 20) ? 2 :
+        [2, 0, 1, 1, 1, 2][(number % 10 < 5) ? number % 10 : 5]];
+
+    //высчитываем дедлайн
+    const calcDeadline = (date) => {
+        const deadline = new Date(date);
+        const toDay = Date.now();
+        //сколько осталось (милисикунд)
+        const remaining = (deadline - toDay) / 1000 / 60 / 60;
+        //если меньше 2х дней то в часах
+        if( (remaining / 24) > 2){
+            return declOfNum(Math.floor(remaining / 24), ['день', 'дня', 'дней']);
+        }
+
+        return declOfNum(Math.floor(remaining), ['час', 'часа', 'часов']);
     };
 
+    //отрисовка во фриланс таблице
     const renderOrders = () => {
         ordersTable.textContent = '';
 
@@ -72,37 +89,68 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.addEventListener('click', handlerModal);
     };
 
+    //обработчик для события внутри модального окна
     const handlerModal = event => {
       const target = event.target;
       const modal = target.closest('.order-modal');
       const order = orders[modal.id];
 
+        //базовые действия во всех кейсах
       const baseAction = () => {
           modal.style.display = 'none';
           toStorage();
           renderOrders();
       };
 
+        //закрываем модальное окно на крестик
       if(target.closest('.close') || target === modal) {
           modal.style.display = 'none';
       }
-
+        //получаем заказ
       if (target.classList.contains('get-order')) {
           order.active = true;
           baseAction();
       }
-
+        //отменяем заказ
         if (target.id === 'capitulation') {
             order.active = false;
             baseAction();
         }
-
+        //выполнили заказ
         if (target.id === 'ready') {
             orders.splice(orders.indexOf(order), 1);
             baseAction();
         }
     };
 
+    //сортировка обьектов в массиве
+    const sortOrder = (arr, property) => {
+        arr.sort( (a, b) => a[property] > b[property]  ? 1 : -1 );
+    };
+
+    //обработчик сортировки заказов
+    headTable.addEventListener('click', (event) => {
+        const target = event.target;
+        if(target.classList.contains('head-sort')){
+
+            if(target.id === 'taskSort'){
+                sortOrder(orders, 'title');
+            }
+
+            if(target.id === 'currencySort'){
+                sortOrder(orders, 'currency');
+            }
+
+            if(target.id === 'deadlineSort'){
+                sortOrder(orders, 'deadline');
+            }
+
+            toStorage();
+            renderOrders();
+        }
+    });
+
+//обработчик открытия модального окна определенного заказа
     ordersTable.addEventListener('click', event => {
        const target = event.target;
 
@@ -113,13 +161,17 @@ document.addEventListener('DOMContentLoaded', () => {
        }
 
     });
-
+//обработчик нажатия на кнопку Заказчика
     customer.addEventListener('click', () => {
        blockChoice.style.display = 'none';
        blockCustomer.style.display = 'block';
+        //минимальное значение даты заказа
+        const toDay = new Date().toISOString().substring(0,10);
+        document.getElementById('deadline').min = toDay;
+
        btnExit.style.display = 'block';
    });
-
+//обработчик нажатия на кнопку фрилансера
     freelancer.addEventListener('click', () => {
        blockChoice.style.display = 'none';
        renderOrders();
@@ -127,13 +179,14 @@ document.addEventListener('DOMContentLoaded', () => {
        btnExit.style.display = 'block';
    });
 
+    //обработчик нажатия на кнопку Выход
     btnExit.addEventListener('click', () => {
         btnExit.style.display = 'none';
         blockCustomer.style.display = 'none';
         blockFreelancer.style.display = 'none';
         blockChoice.style.display = 'block';
     });
-
+    //обработчик формы заказа
     formCustomer.addEventListener('submit', (event) => {
        event.preventDefault();
 
